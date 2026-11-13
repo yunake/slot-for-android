@@ -17,7 +17,7 @@ The port has since grown to other Android handhelds and home consoles. The goal 
 ## Highlights
 
 - **Cartridges first.** Your library is a shelf of cartridges with their real labels, insertion and ejection animations and sounds.
-- **Six systems.** Game Boy, Game Boy Color, Game Boy Advance, NES, Super Nintendo and Mega Drive, each with two emulation cores to choose from.
+- **Seven systems.** Game Boy, Game Boy Color, Game Boy Advance, NES, Super Nintendo and Mega Drive, each with two emulation cores to choose from, and PICO-8 (`.p8` and `.p8.png` carts, played by fake-08), whose carts wear their own label picture.
 - **Any screen shape.** The interface adapts to square, 4:3, 3:2 and widescreen handhelds at their native resolution.
 - **Cart Studio.** Change a cartridge's label, shell colour, finish and shape, right on the handheld.
 - **Screen options.** LCD and CRT shaders, overlays, color correction, Frame Blending and LCD effects, per system or per game.
