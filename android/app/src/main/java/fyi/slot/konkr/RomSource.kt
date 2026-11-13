@@ -64,7 +64,7 @@ internal object RomSource {
                 val entry = zip.nextEntry ?: break
                 if (entry.isDirectory) continue
                 val romExt = extension(entry.name.substringAfterLast('/'))
-                if (romExt !in supported) continue
+                if (romExt !in supported || !Systems.acceptsName(entry.name)) continue
                 require(entry.size == -1L || entry.size in MIN_ROM_BYTES.toLong()..MAX_ROM_BYTES) {
                     "ZIP ROM exceeds safe size limits"
                 }

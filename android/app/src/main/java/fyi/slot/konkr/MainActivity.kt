@@ -2390,6 +2390,10 @@ class MainActivity : Activity() {
                     autoLabelsChainBase = AutoCartLabelDiagnostics.snapshot().saved
                 }
                 try {
+                    // PICO-8 carts carry their labels: no network needed.
+                    Pico8Labels.fill(applicationContext,
+                        shouldContinue = { autoLabelsMayRun() },
+                        onSaved = { uri -> autoLabelUpdates.add(uri) })
                     val manager = getSystemService(CONNECTIVITY_SERVICE) as? ConnectivityManager
                     val caps = manager?.getNetworkCapabilities(manager.activeNetwork)
                     if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) != true) {
