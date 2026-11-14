@@ -4586,6 +4586,8 @@ impl Engine {
                 core = Core::Mgba;
             }
             let core_file = library.join(format!("lib{}_libretro.so", core.as_str()));
+            // The core sees a cached copy, never the cart's name.
+            crate::pico8::set_splore(core == Core::Pico8 && core_selection::is_splore(uri));
             // First game still wakes RA if the asynchronous SAF scan has not run.
             // Perform this mutable operation BEFORE borrowing rom_stem.
             // GBA, GB and GBC use the verified per-console memory maps.

@@ -43,6 +43,13 @@ fn fetch(url: &str, post: Option<&Path>, out: &Path) -> Result<(), Box<dyn std::
     Ok(())
 }
 
+static SPLORE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the game being opened is Splore.p8 (the core only sees a cached
+/// copy of the cart, under another name): read as the core option pico8_boot.
+pub fn set_splore(on: bool) { SPLORE.store(on, std::sync::atomic::Ordering::Relaxed); }
+pub fn splore() -> bool { SPLORE.load(std::sync::atomic::Ordering::Relaxed) }
+
 pub fn install_http() {
     slot_retro::set_http_hook(http);
 }
