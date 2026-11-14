@@ -28,6 +28,12 @@ class SystemsTest {
         assertEquals("FCEUmm", Systems.folderForKey("fceumm"))
     }
 
+    @Test fun aTinyPico8TextCartIsStillACart() {
+        assertEquals(16, Systems.minRomBytes("p8"))
+        assertEquals(RomSource.MIN_ROM_BYTES, Systems.minRomBytes("nes"))
+        assertEquals(RomSource.MIN_ROM_BYTES, Systems.minRomBytes("gba"))
+    }
+
     @Test fun pico8CartsAreP8FilesAndCartPictures() {
         assertEquals("P8", Systems.platformFor("p8"))
         assertEquals("P8", Systems.platformFor("PNG"))

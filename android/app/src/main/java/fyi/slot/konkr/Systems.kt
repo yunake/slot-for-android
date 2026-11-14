@@ -97,6 +97,11 @@ internal object Systems {
     /** A save flush names its core by key; unknown keys keep the old mGBA fallback. */
     fun folderForKey(key: String): String = FOLDERS[key.lowercase(Locale.ROOT)] ?: "mGBA"
 
+    /** The smallest file that can be a cartridge: a .p8 text cart can be a
+     *  one-line program (the "pico-8 cartridge" header and a few bytes). */
+    fun minRomBytes(ext: String): Int =
+        if (platformFor(ext) == P8) 16 else RomSource.MIN_ROM_BYTES
+
     /** How many leading bytes the scanner needs to identify a cartridge. */
     fun headerBytes(ext: String): Int = when (platformFor(ext)) {
         // Both LoROM and HiROM headers, behind a possible 512-byte copier header.

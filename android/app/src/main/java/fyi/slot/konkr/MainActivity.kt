@@ -1787,8 +1787,8 @@ class MainActivity : Activity() {
                 val target = File(dir, "$digest.$ext")
                 // Always open via Android SAF; no assumptions about physical filesystem paths.
                 // A warm copy of this ROM under way is waited for, not made twice.
-                if (!target.isFile || target.length() < 0x150) RomWarmCache.awaitCopy(rawUri, target)
-                if (!target.isFile || target.length() < 0x150) {
+                if (!target.isFile || target.length() < Systems.minRomBytes(ext)) RomWarmCache.awaitCopy(rawUri, target)
+                if (!target.isFile || target.length() < Systems.minRomBytes(ext)) {
                     val temp = File(dir, "$digest.tmp")
                     try {
                         contentResolver.openInputStream(uri)?.use { input ->
@@ -1806,7 +1806,7 @@ class MainActivity : Activity() {
                                         }
                                         output.write(buffer, 0, n)
                                     }
-                                    require(copied >= RomSource.MIN_ROM_BYTES) { "ROM too small" }
+                                    require(copied >= Systems.minRomBytes(ext)) { "ROM too small" }
                                 }
                             }
                         } ?: error("Cannot read this ROM")
