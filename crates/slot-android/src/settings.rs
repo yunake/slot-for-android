@@ -360,9 +360,19 @@ impl Shader {
         Self::CrtGdvTrinitron, Self::CrtGeomDeluxe, Self::CrtRoyale,
         Self::SuperEagle, Self::XbrLv2, Self::Sabr,
     ];
-    /// PICO-8: Off (sharp pixels at any size), then the home consoles'
-    /// CRTs and smoothing filters.
-    pub const PICO8: [Self; 13] = Self::HOME;
+    /// PICO-8: every look slot. has. Off (sharp pixels at any size, so no
+    /// Sharp Bilinear), the handhelds' LCDs and Dot Matrix, the GBA screens,
+    /// then the home consoles' CRTs and smoothing filters. The GBA's own
+    /// Simpletex is left out: the same name as Simpletex.
+    pub const PICO8: [Self; 25] = [
+        Self::Off, Self::Grid, Self::Lcd1x, Self::Lcd3x, Self::ZfastLcd,
+        Self::Simpletex, Self::Dot, Self::LcdGridV2, Self::DotMatrixColor,
+        Self::DotMatrix, Self::LcdGridV2Gba, Self::Agb001, Self::Ags001,
+        Self::ZfastCrt, Self::Fakelottes, Self::CrtPi, Self::CrtEasymode,
+        Self::CrtHyllian, Self::CrtAperture, Self::CrtGdvTrinitron,
+        Self::CrtGeomDeluxe, Self::CrtRoyale, Self::SuperEagle, Self::XbrLv2,
+        Self::Sabr,
+    ];
     pub fn effect(self) -> ScreenEffect {
         match self {
             Self::Off => ScreenEffect::None,
@@ -1470,6 +1480,15 @@ mod tests {
         assert_eq!(s.shader_for(Pico8), Shader::Off);
         assert_eq!(Settings::home_shader_key(Pico8), Some(72));
         assert!(s.change(72, true) && s.shader_for(Pico8) == Shader::PICO8[1]);
+        // Every look slot. has but Sharp Bilinear (Off already is) and the
+        // GBA's same-named Simpletex.
+        assert!(Shader::PICO8.iter().all(|s| *s != Shader::SharpBilinear && *s != Shader::SimpletexGba));
+        for list in [&Shader::GBA[..], &Shader::DMG, &Shader::GBC, &Shader::HOME] {
+            for s in list {
+                assert!(Shader::PICO8.contains(s) || matches!(s, Shader::SharpBilinear | Shader::SimpletexGba), "{s:?}");
+            }
+        }
+        assert_eq!(Settings::look_key(Pico8), None);
         assert_eq!(s.shader_md, Shader::ZfastCrt);
         // Older settings files have no PICO-8 shader.
         let old: Settings = serde_json::from_str(r#"{"shader_md":"xbrlv2"}"#).unwrap();
