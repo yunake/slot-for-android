@@ -19,7 +19,7 @@ MAP
 $CC "${FLAGS[@]}" -shared -o "$OUT/libpico8_libretro.so" \
   "$SRC/src/libretro.c" "$SRC/src/core.c" "$SRC/src/loader.c" "$SRC/src/imports.c" "$SRC/src/sdl.c" \
   "$OUT/heap.o" "$SRC/src/switch.S" \
-  -Wl,--version-script="$OUT/exports.map" -Wl,-z,max-page-size=16384 -Wl,--build-id -lm
+  -Wl,--version-script="$OUT/exports.map" -Wl,-z,max-page-size=16384 -Wl,--build-id -lm -llog
 LIB="$OUT/libpico8_libretro.so"
 SYMBOLS="$("$LLVM/llvm-nm" -D --defined-only "$LIB")"
 for symbol in retro_run retro_serialize retro_unserialize retro_get_system_av_info; do

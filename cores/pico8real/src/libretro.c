@@ -58,7 +58,17 @@ static double audio_owed;
 static int reset_frames;
 static bool running;
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+// The core's own log beside PICO-8's log.txt: frontends may drop theirs.
+static FILE *log_file;
+
 static void log_line(const char *s) {
+    if (log_file) { fprintf(log_file, "%s\n", s); fflush(log_file); }
+#ifdef __ANDROID__
+    __android_log_write(ANDROID_LOG_INFO, "pico8", s);
+#endif
     if (logp) logp(1, "%s\n", s);
     else fprintf(stderr, "%s\n", s);
 }
@@ -143,6 +153,10 @@ bool retro_load_game(const struct retro_game_info *game) {
     char carts[640];
     snprintf(carts, sizeof carts, "%s/carts", home);
     mkdirs(carts);
+    char log_path[640];
+    snprintf(log_path, sizeof log_path, "%s/core.log", home);
+    if (log_file) fclose(log_file);
+    log_file = fopen(log_path, "w");
 
     const char *args[12];
     int n = 0;
@@ -187,6 +201,7 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
 void retro_unload_game(void) {
     p8_shutdown();
     running = false;
+    if (log_file) { fclose(log_file); log_file = NULL; }
 }
 
 unsigned retro_get_region(void) { return 0; }
@@ -241,6 +256,14 @@ void retro_run(void) {
     for (int i = 0; i < 3 && running && SHIM->vclock_ms < host_ms; i++)
         if (p8_frame(keys) == P8_EXIT) running = false;
     present();
+    static unsigned runs;
+    if (++runs % 3600 == 1) {
+        int w = 0, h = 0, pitch = 0;
+        const uint8_t *px = p8_screen(&w, &h, &pitch);
+        p8_logf("pico8: run %u host %.0f vclock %u presents %llu kind %u %dx%d px %08x", runs, host_ms,
+                SHIM->vclock_ms, (unsigned long long)SHIM->frames, SHIM->frame_kind, w, h,
+                px ? *(const uint32_t *)(px + (size_t)(h / 2) * pitch + (w / 2) * 4) : 0);
+    }
 
     int rate = p8_audio_rate();
     if (rate && audio_batch) {
