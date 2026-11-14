@@ -6,10 +6,6 @@
 //! chose), the carts on its right close the gap, and Android deletes the
 //! ROM file; saves and save states stay.
 //!
-//! Game menu > Delete Cartridge does the same for the game being played:
-//! A once arms it ("Press A again to delete", for a few seconds), A again
-//! saves and ejects as Save and Eject does, then the cart leaves the shelf.
-//!
 //! Tapped alone on the Game Boy Advance shelf, either one shows the Game Boy
 //! Advance Video shelf behind it, and back (as slot. original 1.15).
 use super::*;
@@ -19,8 +15,6 @@ use super::*;
 pub(super) const VIDEO_RACK: usize = FAVORITES_RACK + 1;
 /// How long L2 and R2 are held together to delete.
 const HOLD_S: f32 = 1.5;
-/// How long Delete Cartridge stays armed for the second A.
-const ARMED_S: f32 = 4.0;
 /// The cart's jump and shrink.
 const EJECT_S: f32 = 0.7;
 /// The ring is drawn again every 1/48 of the way round.
@@ -51,18 +45,6 @@ pub(super) struct Triggers {
     ring: Option<(slot_gfx::TexId, i32)>,
     text: Option<(slot_gfx::TexId, u32, u32)>,
     pub(super) ejecting: Option<Ejecting>,
-    /// Game menu > Delete Cartridge: since when the first A armed it.
-    armed: Option<Instant>,
-    /// The game ejected to be deleted, once the shelf is back.
-    after_exit: Option<PathBuf>,
-}
-
-impl Triggers {
-    /// Delete Cartridge waits for its second A.
-    pub(super) fn delete_armed(&self) -> bool {
-        self.armed.is_some_and(|at| at.elapsed().as_secs_f32() < ARMED_S)
-    }
-    pub(super) fn disarm_delete(&mut self) { self.armed = None; }
 }
 
 /// A GBA Video cart: its game code starts with M.
@@ -134,32 +116,6 @@ impl Engine {
         if at == 0 && video && (self.gba_video || !gba) { VIDEO_RACK } else { at }
     }
 
-    /// Game menu > Delete Cartridge: the first A arms it, the second saves,
-    /// ejects and deletes the game.
-    pub(super) fn delete_from_menu(&mut self) {
-        if !self.triggers.delete_armed() {
-            self.triggers.armed = Some(Instant::now());
-            return;
-        }
-        self.triggers.armed = None;
-        let Some(uri) = self.requested_uri.clone() else { return };
-        self.handle(Input::Exit);
-        // Exit keeps the game when its save failed: nothing is deleted then.
-        if self.game.is_none() { self.triggers.after_exit = Some(PathBuf::from(uri)); }
-    }
-
-    /// The ejected game leaves the shelf as an L2 + R2 delete does; off
-    /// screen (another shelf, no longer in hand) it just goes.
-    fn delete_after_exit(&mut self) {
-        let Some(uri) = self.triggers.after_exit.take() else { return };
-        let in_hand = self.shelves.get(self.active)
-            .and_then(|s| s.carts.get(s.index)).is_some_and(|c| c.rom == uri);
-        if in_hand { return self.start_eject(); }
-        DELETE_REQUEST.lock().unwrap_or_else(|e| e.into_inner())
-            .push_back(uri.to_string_lossy().into_owned());
-        self.remove_cart_everywhere(&uri, None);
-    }
-
     /// Every frame on the carousel: the hold ends when it should, the
     /// delete starts once held long enough, the cart leaves.
     pub(super) fn tick_triggers(&mut self) {
@@ -170,7 +126,6 @@ impl Engine {
             if self.triggers.ejecting.is_some() { self.finish_eject(); }
             return;
         }
-        if self.triggers.after_exit.is_some() && self.triggers.ejecting.is_none() { self.delete_after_exit(); }
         if let Some(since) = self.triggers.hold {
             let done = since.elapsed().as_secs_f32() / HOLD_S;
             if done >= 1.0 {

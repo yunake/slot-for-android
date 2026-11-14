@@ -148,7 +148,7 @@ fn paused_game_controls_inherit_globals_until_overridden() {
 fn eject_to_play_solo_is_an_action_not_a_noop() {
     assert_eq!(pause_rows(false,false),
         &[PauseRow::Resume,PauseRow::States,PauseRow::Multiplayer,
-            PauseRow::Cheats,PauseRow::Settings,PauseRow::SaveEject,PauseRow::Delete]);
+            PauseRow::Cheats,PauseRow::Settings,PauseRow::SaveEject]);
     assert_eq!(pause_rows(true,false),
         &[PauseRow::Resume,PauseRow::Multiplayer,PauseRow::Settings,
             PauseRow::SaveEject]);
@@ -168,11 +168,6 @@ fn eject_to_play_solo_is_an_action_not_a_noop() {
     assert!(!pause_rows(true,false).contains(&PauseRow::States));
     // Cheats belong to a solo game: none while linked.
     assert!(!pause_rows(true,false).contains(&PauseRow::Cheats));
-    // Delete Cartridge is a solo game's, last, below Save and Eject.
-    assert!(!pause_rows(true,false).contains(&PauseRow::Delete));
-    assert!(!pause_rows(false,true).contains(&PauseRow::Delete));
-    assert_eq!(MENU_TEXT[pause_row_text(PauseRow::Delete,false)],"Delete Cartridge");
-    assert_eq!(MENU_TEXT[140],"Press A again to delete");
     assert_eq!(MENU_TEXT[pause_row_text(PauseRow::Cheats,false)],"Cheats");
 }
 
