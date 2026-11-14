@@ -509,7 +509,7 @@ enum ShelfOverlay {
     Romm,
 }
 
-const MENU_TEXT: [&str; 139] = [
+const MENU_TEXT: [&str; 141] = [
     "MENU",                             // 0
     "Library",                          // 1
     "Cart Studio",                      // 2
@@ -649,6 +649,8 @@ const MENU_TEXT: [&str; 139] = [
     "Upscaler",                           // 136, GBA Video Screen (Siham 2026-11-10)
     "Sensitivity",                        // 137, tilt and gyro games (Siham 2026-11-12)
     "PICO-8",                             // 138, Settings > Systems
+    "Delete Cartridge",                   // 139, game menu
+    "Press A again to delete",            // 140, Delete Cartridge armed
 ];
 
 /// Settings > Systems, top to bottom.
@@ -3743,6 +3745,8 @@ impl Engine {
                         let linked = self.game.as_ref().is_some_and(GameSession::linked);
                         let relaunch = self.game.as_ref().is_some_and(GameSession::requires_relaunch);
                         if let ShelfOverlay::GameMenu { row } = self.overlay {
+                            let on_delete = pause_rows(linked, relaunch).get(row) == Some(&PauseRow::Delete);
+                            if !(code == 96 && on_delete) { self.triggers.disarm_delete(); }
                             match code {
                                 19 | 20 => self.overlay = ShelfOverlay::GameMenu {
                                     row: move_menu_row(row, code, pause_rows(linked, relaunch).len()),
@@ -3770,6 +3774,7 @@ impl Engine {
                                     Some(PauseRow::Cheats) if !linked && !relaunch => self.open_cheats(),
                                     Some(PauseRow::Settings) if !relaunch =>
                                         self.overlay = ShelfOverlay::PauseSettings { row: 0 },
+                                    Some(PauseRow::Delete) if !linked && !relaunch => self.delete_from_menu(),
                                     _ => {}
                                 },
                                 97 => if !relaunch {
@@ -6634,8 +6639,12 @@ impl Engine {
             ShelfOverlay::GameMenu { row } => {
                 let linked = self.game.as_ref().is_some_and(GameSession::linked);
                 let relaunch = self.game.as_ref().is_some_and(GameSession::requires_relaunch);
+                let armed = self.triggers.delete_armed();
                 let indices: Vec<usize> = pause_rows(linked, relaunch).iter()
-                    .map(|item| pause_row_text(*item, relaunch)).collect();
+                    .map(|item| match item {
+                        PauseRow::Delete if armed => 140,
+                        _ => pause_row_text(*item, relaunch),
+                    }).collect();
                 self.draw_original_style_menu(19, &indices, row, out);
             }
             ShelfOverlay::PauseSettings { row } => {
@@ -8117,10 +8126,10 @@ fn link_mode_can_switch(core: Core, chosen: LinkKind, code: &str,
 /// These rows are modelled by *action*, not by a hardcoded screen index.
 /// It prevents a linked session from routing "Save & Eject" to "Resume".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PauseRow { Resume, States, Multiplayer, Cheats, Settings, SaveEject }
+enum PauseRow { Resume, States, Multiplayer, Cheats, Settings, SaveEject, Delete }
 const SOLO_PAUSE_ROWS: &[PauseRow] = &[
     PauseRow::Resume, PauseRow::States, PauseRow::Multiplayer, PauseRow::Cheats,
-    PauseRow::Settings, PauseRow::SaveEject,
+    PauseRow::Settings, PauseRow::SaveEject, PauseRow::Delete,
 ];
 const LINK_PAUSE_ROWS: &[PauseRow] = &[
     PauseRow::Resume, PauseRow::Multiplayer, PauseRow::Settings,
@@ -8145,6 +8154,7 @@ fn pause_row_text(row: PauseRow, requires_relaunch: bool) -> usize {
         PauseRow::Settings => 25,
         PauseRow::SaveEject if requires_relaunch => 78,
         PauseRow::SaveEject => 21,
+        PauseRow::Delete => 139,
     }
 }
 
