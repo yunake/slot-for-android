@@ -1,8 +1,8 @@
 diff --git a/platform/libretro/libretro.cpp b/platform/libretro/libretro.cpp
-index ff27a59..4d80325 100644
+index ff27a59..b15aa9e 100644
 --- a/platform/libretro/libretro.cpp
 +++ b/platform/libretro/libretro.cpp
-@@ -537,216 +537,161 @@ EXPORT size_t retro_serialize_size()
+@@ -537,216 +537,164 @@ EXPORT size_t retro_serialize_size()
      sizeof(size_t) + sizeof(PicoRam) + 
      //size plus audio state
      sizeof(size_t) + sizeof(audioState_t) + 
@@ -114,6 +114,7 @@ index ff27a59..4d80325 100644
 +    offset += sizeof(size_t);
 +    vmSaveState_t vmState;
 +    _vm->SaveVmState(&vmState);
++    vmState.hostFrame = (uint32_t)frame;
 +    memcpy(out + offset, &vmState, sizeof(vmSaveState_t));
 +    offset += sizeof(vmSaveState_t);
 +
@@ -276,9 +277,10 @@ index ff27a59..4d80325 100644
 +    if (!read_size(in, size, offset, audioSize) || audioSize != sizeof(audioState_t) || offset + audioSize > size) return false;
 +    const char* audio = in + offset;
 +    offset += audioSize;
-+    if (!read_size(in, size, offset, vmSize) || vmSize != sizeof(vmSaveState_t) || offset + vmSize > size) return false;
-+    vmSaveState_t vmState;
-+    memcpy(&vmState, in + offset, sizeof(vmSaveState_t));
++    // states from before the host frame was kept are shorter by its 4 bytes
++    if (!read_size(in, size, offset, vmSize) || (vmSize != sizeof(vmSaveState_t) && vmSize != offsetof(vmSaveState_t, hostFrame)) || offset + vmSize > size) return false;
++    vmSaveState_t vmState = {};
++    memcpy(&vmState, in + offset, vmSize);
 +    offset += vmSize;
 +    if (!read_size(in, size, offset, luaStateSize)) return false;
 +    if (luaStateSize == 0 || luaStateSize > LUASTATEBUFFSIZE || offset + luaStateSize > size) return false;
@@ -297,6 +299,7 @@ index ff27a59..4d80325 100644
 +    }
 +    memcpy(&now->_musicChannel, audio + offsetof(audioState_t, _musicChannel), sizeof(musicChannel));
 +    _vm->LoadVmState(&vmState);
++    frame = vmState.hostFrame;
 +    // a press is a button held now and not in the frame before: the frame
 +    // before is the state's, so both consoles of a Multiplayer session (and
 +    // a rewind) see the same presses
@@ -335,7 +338,7 @@ index ff27a59..4d80325 100644
  }
  
  EXPORT void retro_cheat_reset()
-@@ -780,6 +725,10 @@ EXPORT bool retro_load_game(struct retro_game_info const *info)
+@@ -780,6 +728,10 @@ EXPORT bool retro_load_game(struct retro_game_info const *info)
          _vm->QueueCartChange(info->path);
      }
  
@@ -624,10 +627,10 @@ index 32cb4f4..1ae5fc4 100644
  }
  
 diff --git a/source/vm.h b/source/vm.h
-index 0152e05..6b978f7 100644
+index 0152e05..2be0032 100644
 --- a/source/vm.h
 +++ b/source/vm.h
-@@ -18,6 +18,15 @@ using namespace std;
+@@ -18,6 +18,18 @@ using namespace std;
  
  using namespace z8;
  
@@ -638,12 +641,15 @@ index 0152e05..6b978f7 100644
 +    int32_t frameCount;
 +    uint8_t kHeld[8];
 +    uint16_t framesHeld[8][8];
++    // the host's own frame counter: libretro mixes sound every other frame,
++    // so music only advances in step on two consoles with the same one
++    uint32_t hostFrame;
 +};
 +
  class Vm {
      Host* _host;
      PicoRam* _memory;
-@@ -93,6 +102,9 @@ class Vm {
+@@ -93,6 +105,9 @@ class Vm {
      int GetTargetFps();
  
      int GetFrameCount();
@@ -653,7 +659,7 @@ index 0152e05..6b978f7 100644
  
      void GameLoop();
  
-@@ -174,7 +186,7 @@ class Vm {
+@@ -174,7 +189,7 @@ class Vm {
      string getCartBreadcrumb();
      string getCartParam();
  
