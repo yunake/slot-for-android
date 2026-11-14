@@ -38,6 +38,12 @@ fi
 if [ "$SUBMODULES" = 1 ]; then
   git -C "$SRC" submodule update --init --depth=1 --recursive
 fi
+# Start from the pinned tree: patches that touch the same file only apply in
+# order, onto the one before (fake08's input and save state patches).
+git -C "$SRC" checkout -q -- .
+if [ "$SUBMODULES" = 1 ]; then
+  git -C "$SRC" submodule foreach -q --recursive git checkout -q -- .
+fi
 # Patches for this core, applied strictly: never a half-patched source.
 PATCHES=()
 for patch_file in "$ROOT/cores/$CORE"/*.patch; do
