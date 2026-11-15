@@ -6,6 +6,34 @@ use std::time::Duration;
 /// Where BiosLibrary stages the Raspberry Pi build of PICO-8.
 pub const DIR: &str = "BIOS/pico-8";
 pub const MISSING: &str = "PICO-8 isn't in the BIOS folder.";
+pub const SPLORE_KEPT: &str = "Splore comes with PICO-8. It can't be deleted.";
+
+/// Splore's label (assets/pico8/splore-label.png): 128x128, PICO-8's palette.
+const SPLORE_LABEL: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/pico8/splore-label.png"));
+
+/// Splore as a cart on the PICO-8 shelf, first, while PICO-8 is installed.
+/// Its label is written once; Cart Studio may replace it like any other.
+pub fn splore_cart(storage: &Path) -> Option<slot_store::Cart> {
+    if !installed(storage) { return None; }
+    let uri = crate::core_selection::SPLORE_URI;
+    let label = storage.join("Labels").join(format!("{}.png", crate::core_selection::key(uri)));
+    if !label.exists() {
+        let _ = std::fs::create_dir_all(storage.join("Labels"));
+        if let Err(err) = slot_store::atomic_write(&label, SPLORE_LABEL) {
+            eprintln!("slot-konkr: Splore's label: {err}");
+        }
+    }
+    Some(slot_store::Cart {
+        platform: slot_store::Platform::Pico8,
+        stem: "Splore".into(),
+        title: "Splore".into(),
+        code: String::new(),
+        rom: uri.into(),
+        label: Some(label),
+        shell: None,
+        battery: false,
+    })
+}
 
 pub fn installed(storage: &Path) -> bool {
     let dir = storage.join(DIR);

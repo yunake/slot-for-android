@@ -837,6 +837,9 @@ fn library_carts(library: Option<&[RomEntry]>, root: Option<&std::path::Path>)
             // Only app-private labels are used; never rewrite ROMs.
             cart.label = Some(root.join("Labels").join(filename));
         }
+        if let Some(splore) = library.and_then(|_| crate::pico8::splore_cart(root)) {
+            systems[Platform::Pico8 as usize].insert(0, splore);
+        }
     }
     let video = systems.pop().unwrap_or_default();
     (systems, video)
@@ -4298,7 +4301,9 @@ impl Engine {
                             self.insert_started = Some(Instant::now());
                             self.a_down_at = self.insert_started;
                             self.fresh_launch = false;
-                            if uri.starts_with("content://") {
+                            // ROM files, and Splore (no file: Android hands the
+                            // core a stand-in, MainActivity.loadGameFromSaf)
+                            if uri.starts_with("content://") || core_selection::is_splore(&uri) {
                                 let uri = uri.into_owned();
                                 let platform = selected.platform;
                                 *LAUNCH_CORE.lock().unwrap_or_else(|e| e.into_inner()) =
@@ -7713,6 +7718,8 @@ impl Engine {
             self.shelves[self.active].carts
                 .get(self.shelves[self.active].index)
                 .map(|cart|cart.rom.to_string_lossy().into_owned())
+                // only ROM files are copied ahead (Splore is none)
+                .filter(|uri|uri.starts_with("content://"))
         } else { None };
         let mut last = WARM_ROM_URI.lock().unwrap_or_else(|e|e.into_inner());
         if *last != candidate { *last = candidate; }
