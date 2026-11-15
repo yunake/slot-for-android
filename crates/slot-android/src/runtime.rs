@@ -4172,8 +4172,14 @@ impl Engine {
                                 let now = self.born.elapsed().as_millis() as u64;
                                 if let Some(picker) = self.picker.as_mut() {
                                     match code {
-                                        21 => { picker.press(Press::Left, now); }
-                                        22 => { picker.press(Press::Right, now); }
+                                        21 | 22 => {
+                                            let press = if code == 21 { Press::Left } else { Press::Right };
+                                            let to = if code == 21 { picker.left() } else { picker.right() };
+                                            if picker.press(press, now) == crate::core_picker::Outcome::Refused
+                                                && !picker.allows(to) {
+                                                set_message(crate::pico8::SPLORE_ONLY.to_string());
+                                            }
+                                        }
                                         96 => {
                                             let core = picker.seat();
                                             let cart = &self.shelves[self.active].carts
@@ -4264,6 +4270,9 @@ impl Engine {
                             let mut picker = CorePicker::open_between(current_core,
                                 Core::primary_for(selected.platform),
                                 Core::alternate_for(selected.platform), now);
+                            if core_selection::is_splore(&selected.rom.to_string_lossy()) {
+                                picker = picker.only(Core::Pico8);
+                            }
                             // A clear cart's lid waits for its plastic without
                             // the board (start_waiting_picker), or the shelf
                             // face would lift with the board drawn on it.
@@ -6701,7 +6710,8 @@ impl Engine {
             out.push(Draw::Tex {
                 x: x.round(), y: y.round(),
                 w: SOCKET_W as f32 * zoom, h: SOCKET_H as f32 * zoom,
-                tex, alpha: 1.0,
+                // a core this cart can't run on (fake-08 for Splore) is greyed
+                tex, alpha: if picker.allows(core) { 1.0 } else { 0.3 },
             });
         }
 

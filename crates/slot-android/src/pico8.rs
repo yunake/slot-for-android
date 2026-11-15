@@ -6,6 +6,8 @@ use std::time::Duration;
 /// Where BiosLibrary stages the Raspberry Pi build of PICO-8.
 pub const DIR: &str = "BIOS/pico-8";
 pub const MISSING: &str = "PICO-8 isn't in the BIOS folder.";
+/// Splore is part of PICO-8 itself, not a cart: fake-08 has nothing like it.
+pub const SPLORE_ONLY: &str = "Splore is part of PICO-8 itself. fake-08 can't run it.";
 pub const SPLORE_KEPT: &str = "Splore comes with PICO-8. It can't be deleted.";
 
 /// Splore's label (assets/pico8/splore-label.png): 128x128, PICO-8's palette.
