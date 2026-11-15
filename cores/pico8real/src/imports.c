@@ -92,7 +92,10 @@ struct p8file {
     char path[512];
     struct p8file *next;
 };
-uint32_t p8_generation = 1;  // bumped when a state is loaded: host FILE*s are stale
+// Which process, and which load in it, a handle's host FILE* belongs to: a
+// new random value at start and on each state load, so a state made in
+// another process (which counted its loads the same way) never matches.
+uint32_t p8_generation;
 
 static char logline[2][512];
 static size_t loglen[2];
@@ -156,7 +159,8 @@ void p8_files_save_positions(void) {
 }
 
 void p8_files_after_load(void) {
-    p8_generation++;
+    uint32_t old = p8_generation;
+    do p8_generation = arc4random(); while (!p8_generation || p8_generation == old);
 }
 
 static int is_log(void *h) { struct p8file *f = h; return f && f->magic == P8FILE_MAGIC && f->kind == F_LOG; }
