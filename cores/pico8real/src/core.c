@@ -3,6 +3,8 @@
 #include "p8.h"
 
 #include <errno.h>
+#include <dlfcn.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -17,6 +19,67 @@ void p8_set_keys(const uint8_t *keys);
 
 static struct p8image img;
 static int mapped, booted, exited;
+
+
+/* ---- a crash inside PICO-8 is written to the log before the process goes ---- */
+
+static struct sigaction old_actions[32];
+static const int fatal[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP, SIGABRT};
+
+static char *hex(char *p, const char *label, uint64_t v) {
+    while (*label) *p++ = *label++;
+    *p++ = '0'; *p++ = 'x';
+    for (int s = 60; s >= 0; s -= 4) *p++ = "0123456789abcdef"[(v >> s) & 15];
+    return p;
+}
+// A code address as an offset into pico8_64 when it is one: what objdump shows.
+static uint64_t image_off(uint64_t a) { return a >= img.base && a < img.base + img.span ? a - img.base : a; }
+
+static void on_fatal(int sig, siginfo_t *si, void *uc_) {
+    ucontext_t *uc = uc_;
+    char line[256], *p = line;
+    const char *head = "pico8: fatal signal ";
+    while (*head) *p++ = *head++;
+    *p++ = '0' + sig / 10; *p++ = '0' + sig % 10;
+    p = hex(p, " addr ", (uint64_t)si->si_addr);
+    p = hex(p, " pc ", image_off(uc->uc_mcontext.pc));
+    p = hex(p, " lr ", image_off(uc->uc_mcontext.regs[30]));
+    p = hex(p, " sp ", uc->uc_mcontext.sp);
+    *p++ = '\n';
+    p8_log_raw(line, (size_t)(p - line));
+    // where: pc, lr, then the frame-pointer chain, by library
+    uint64_t at[10] = {uc->uc_mcontext.pc, uc->uc_mcontext.regs[30]};
+    int n = 2;
+    for (uint64_t *fp = (uint64_t *)uc->uc_mcontext.regs[29]; n < 10 && fp && !((uint64_t)fp & 7); fp = (uint64_t *)fp[0]) {
+        if (fp[1] == 0) break;
+        at[n++] = fp[1];
+        if (fp[0] <= (uint64_t)fp) break;
+    }
+    for (int i = 0; i < n; i++) {
+        Dl_info di;
+        if (image_off(at[i]) != at[i])
+            p8_logf("  #%d pico8_64+0x%llx", i, (unsigned long long)image_off(at[i]));
+        else if (dladdr((void *)at[i], &di) && di.dli_fname)
+            p8_logf("  #%d %s+0x%llx (%s)", i, di.dli_fname, (unsigned long long)(at[i] - (uint64_t)di.dli_fbase),
+                    di.dli_sname ? di.dli_sname : "?");
+        else p8_logf("  #%d 0x%llx", i, (unsigned long long)at[i]);
+    }
+    // then Android's own handler: the tombstone
+    sigaction(sig, &old_actions[sig], NULL);
+    raise(sig);
+}
+
+static void crash_reporter(void) {
+    static int installed;
+    if (installed) return;
+    installed = 1;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = on_fatal;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    for (size_t i = 0; i < sizeof fatal / sizeof fatal[0]; i++) sigaction(fatal[i], &sa, &old_actions[fatal[i]]);
+}
 
 // Whether [addr, addr+len) holds only anonymous memory: what an earlier
 // load of this library left behind, which it may take back.
@@ -75,6 +138,7 @@ static int map_regions(char *err, size_t errlen) {
 
 int p8_boot(const char *exe, const char *home, int argc, const char *const *argv, char *err, size_t errlen) {
     if (booted) { snprintf(err, errlen, "already running"); return -1; }
+    crash_reporter();
     if (map_regions(err, errlen)) return -1;
     memset(SHIM, 0, sizeof *SHIM);
     SHIM->magic = P8_SHIM_MAGIC;

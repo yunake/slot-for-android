@@ -157,6 +157,7 @@ bool retro_load_game(const struct retro_game_info *game) {
     snprintf(log_path, sizeof log_path, "%s/core.log", home);
     if (log_file) fclose(log_file);
     log_file = fopen(log_path, "w");
+    p8_log_fd = log_file ? fileno(log_file) : -1;
 
     const char *args[12];
     int n = 0;
@@ -201,7 +202,7 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
 void retro_unload_game(void) {
     p8_shutdown();
     running = false;
-    if (log_file) { fclose(log_file); log_file = NULL; }
+    if (log_file) { p8_log_fd = -1; fclose(log_file); log_file = NULL; }
 }
 
 unsigned retro_get_region(void) { return 0; }

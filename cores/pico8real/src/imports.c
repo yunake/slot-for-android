@@ -21,6 +21,10 @@
 #include <utime.h>
 
 void (*p8_log)(const char *line);
+int p8_log_fd = 2;
+void p8_log_raw(const char *s, size_t n) {
+    if (p8_log_fd >= 0) { ssize_t r = write(p8_log_fd, s, n); (void)r; }
+}
 int (*p8_http_get)(const char *url, const char *post_path, const char *out_path);
 
 void p8_logf(const char *fmt, ...) {

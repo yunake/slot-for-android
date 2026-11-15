@@ -132,6 +132,9 @@ void p8_files_after_load(void);
 extern uint32_t p8_generation;
 extern void (*p8_log)(const char *line);
 void p8_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+// The log as a file descriptor, for what a signal handler writes (-1: none).
+extern int p8_log_fd;
+void p8_log_raw(const char *s, size_t n);
 /* wget "url" -q -O "file": the host fetches, 0 on success */
 extern int (*p8_http_get)(const char *url, const char *post_path, const char *out_path);
 void p8_imports_init(void);
