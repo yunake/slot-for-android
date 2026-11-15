@@ -20,6 +20,13 @@ void p8_set_keys(const uint8_t *keys);
 static struct p8image img;
 static int mapped, booted, exited;
 
+extern int p8_threads;  // PICO-8's own threads still running (sdl.c)
+
+// Waits up to `ms` for PICO-8's threads (Splore's downloads) to end.
+static int threads_done(int ms) {
+    for (int i = 0; i < ms / 10 && __atomic_load_n(&p8_threads, __ATOMIC_SEQ_CST); i++) usleep(10000);
+    return !__atomic_load_n(&p8_threads, __ATOMIC_SEQ_CST);
+}
 
 /* ---- a crash inside PICO-8 is written to the log before the process goes ---- */
 
@@ -139,6 +146,9 @@ static int map_regions(char *err, size_t errlen) {
 int p8_boot(const char *exe, const char *home, int argc, const char *const *argv, char *err, size_t errlen) {
     if (booted) { snprintf(err, errlen, "already running"); return -1; }
     crash_reporter();
+    // The last PICO-8's downloads end before its memory is taken back.
+    if (!threads_done(35000)) { snprintf(err, errlen, "the last PICO-8 is still downloading"); return -1; }
+    if (mapped && img.base) { p8_unload_image(); p8_heap_release(); memset(&img, 0, sizeof img); }
     if (map_regions(err, errlen)) return -1;
     memset(SHIM, 0, sizeof *SHIM);
     SHIM->magic = P8_SHIM_MAGIC;
@@ -268,6 +278,12 @@ size_t p8_state_size(void) {
 
 int p8_state_save(void *buf, size_t len) {
     if (!booted || exited) return -1;
+    // A thread (a download) changes memory as it is copied: no state then.
+    if (__atomic_load_n(&p8_threads, __ATOMIC_SEQ_CST)) {
+        static int told;
+        if (!told++) p8_logf("pico8: no state while PICO-8 is downloading");
+        return -1;
+    }
     struct state_header h;
     layout(&h);
     if (len < sizeof h + h.rw_len + h.shim_len + h.stack_len + h.heap_len) return -1;
@@ -292,8 +308,12 @@ int p8_state_load(const void *buf, size_t len) {
     if (h.magic != STATE_MAGIC || h.version != STATE_VERSION) { p8_logf("pico8: not a PICO-8 state"); return -1; }
     if (h.image_hash != img.hash) { p8_logf("pico8: state is from another pico8_64"); return -1; }
     if (h.rw_len != img.rw_end - img.rw_start || h.shim_len != sizeof(struct p8shim) || h.stack_len > P8_STACK_SIZE - 0x10000 ||
-        h.heap_len > P8_HEAP_MAX || len < sizeof h + h.rw_len + h.shim_len + h.stack_len + h.heap_len)
+        h.heap_len > P8_HEAP_MAX || len < sizeof h + h.rw_len + h.shim_len + h.stack_len + h.heap_len) {
+        p8_logf("pico8: state has another layout (%zu bytes)", len);
         return -1;
+    }
+    // A running thread would write over what the state brings back.
+    if (!threads_done(5000)) { p8_logf("pico8: state not loaded: PICO-8 is still downloading"); return -1; }
     const uint8_t *p = (const uint8_t *)buf + sizeof h;
     memcpy((void *)img.rw_start, p, h.rw_len); p += h.rw_len;
     memcpy((void *)P8_SHIM, p, h.shim_len); p += h.shim_len;
@@ -306,15 +326,13 @@ int p8_state_load(const void *buf, size_t len) {
     return 0;
 }
 
-extern int p8_threads;
-
-// Everything goes; PICO-8's threads (Splore's downloads) finish first.
+// Everything goes; PICO-8's threads (Splore's downloads) finish first. One
+// still running keeps PICO-8's memory until the next boot waits for it.
 void p8_shutdown(void) {
     if (!booted) return;
-    for (int i = 0; i < 2000 && __atomic_load_n(&p8_threads, __ATOMIC_SEQ_CST); i++) usleep(10000);
-    if (__atomic_load_n(&p8_threads, __ATOMIC_SEQ_CST)) {
+    booted = 0;
+    if (!threads_done(3000)) {
         p8_logf("pico8: a download is still running; PICO-8's memory stays");
-        booted = 0;
         return;
     }
     p8_unload_image();
@@ -327,5 +345,5 @@ void p8_shutdown(void) {
         munmap((void *)P8_WSTACKS, P8_WSTACK_N * P8_STACK_ALIGN);
         mapped = 0;
     }
-    booted = 0;
+    memset(&img, 0, sizeof img);
 }
