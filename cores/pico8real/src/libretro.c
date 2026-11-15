@@ -253,7 +253,9 @@ void retro_run(void) {
     read_keys(keys);
     host_ms += 1000.0 / 60.0;
     // PICO-8 paces itself on SDL_Delay; it runs as many frames as fit.
-    if (host_ms < SHIM->vclock_ms - 100 || host_ms > SHIM->vclock_ms + 100) host_ms = SHIM->vclock_ms;
+    // (double: vclock is unsigned, and under 100 ms "vclock - 100" wrapped round)
+    double vclock = SHIM->vclock_ms;
+    if (host_ms < vclock - 100 || host_ms > vclock + 100) host_ms = vclock;
     for (int i = 0; i < 3 && running && SHIM->vclock_ms < host_ms; i++)
         if (p8_frame(keys) == P8_EXIT) running = false;
     present();
