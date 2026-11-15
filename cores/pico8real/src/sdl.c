@@ -237,6 +237,14 @@ void p8_pre_present(void *r) {
     (void)r;
     SHIM->frames++;
     SHIM->gettick_spin = 0;
+    // Vsync: a present takes the rest of a 60 Hz frame, as on a real
+    // display. PICO-8 relies on it where it doesn't wait on SDL_Delay (its
+    // boot, its menus); without it its clock would hardly move there.
+    static uint32_t last_present;
+    uint32_t frame = 16 + (SHIM->frames % 3 != 0);  // 16.67 ms on average
+    if (SHIM->vclock_ms - last_present < frame) SHIM->vclock_ms = last_present + frame;
+    last_present = SHIM->vclock_ms;
+    turn_vclock = SHIM->vclock_ms;
 }
 void p8_pre_window(struct sdl_window *w) {
     p8_pre_present(NULL);
