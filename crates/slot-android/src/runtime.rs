@@ -386,7 +386,7 @@ fn set_message(message: String) {
 
 /// Short user-facing sentence on screen; the technical cause goes to logcat.
 fn set_error_message(message: &str, detail: &dyn std::fmt::Display) {
-    crate::game::log_launch_timing(&format!("{message} ({detail})"));
+    crate::game::log_error(&format!("{message} ({detail})"));
     set_message(message.into());
 }
 

@@ -35,6 +35,19 @@ pub(crate) fn log_launch_timing(message: &str) {
     eprintln!("SlotKONKR: {message}");
 }
 
+/// An error, at ERROR: some devices' logcat (the Retroid Pocket's) keeps
+/// no app messages below it.
+pub(crate) fn log_error(message: &str) {
+    #[cfg(target_os = "android")]
+    if let Ok(text) = std::ffi::CString::new(message) {
+        unsafe {
+            __android_log_write(6, c"SlotKONKR".as_ptr(), text.as_ptr());
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    eprintln!("SlotKONKR: {message}");
+}
+
 // A Link core must NEVER become a standalone emulator after End Link,
 // peer loss or Android sleep. The private GBA state is a multiplayer-only
 // timeline. Resume requires safe Eject followed by a new solo core launch.
