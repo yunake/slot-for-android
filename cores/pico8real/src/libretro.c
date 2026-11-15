@@ -5,6 +5,7 @@
 // directory as pico-8/pico8_64 and pico-8/pico8.dat. A cart named
 // splore.p8 (or the core option pico8_boot=splore) opens Splore instead of a cart.
 #include "p8.h"
+#include <time.h>
 
 #include <stdarg.h>
 #include <stdbool.h>
@@ -180,6 +181,7 @@ bool retro_load_game(const struct retro_game_info *game) {
         args[n++] = path;
     }
     char err[256];
+    p8_logf("pico8: %s %s", args[n - (splore ? 1 : 2)], splore ? "" : path);
     if (p8_boot(exe, home, n, args, err, sizeof err)) {
         p8_logf("pico8: %s", err);
         return false;
@@ -257,14 +259,16 @@ void retro_run(void) {
     double vclock = SHIM->vclock_ms;
     if (host_ms < vclock - 100 || host_ms > vclock + 100) host_ms = vclock;
     for (int i = 0; i < 3 && running && SHIM->vclock_ms < host_ms; i++)
-        if (p8_frame(keys) == P8_EXIT) running = false;
+        if (p8_frame(keys) == P8_EXIT) { running = false; p8_logf("pico8: exited"); }
     present();
     static unsigned runs;
-    if (++runs % 3600 == 1) {
+    if (++runs % 600 == 1) {
         int w = 0, h = 0, pitch = 0;
         const uint8_t *px = p8_screen(&w, &h, &pitch);
-        p8_logf("pico8: run %u host %.0f vclock %u presents %llu kind %u %dx%d px %08x", runs, host_ms,
-                SHIM->vclock_ms, (unsigned long long)SHIM->frames, SHIM->frame_kind, w, h,
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        p8_logf("pico8: run %u wall %lld host %.0f vclock %u presents %llu kind %u %dx%d px %08x", runs,
+                (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000, host_ms, SHIM->vclock_ms, (unsigned long long)SHIM->frames, SHIM->frame_kind, w, h,
                 px ? *(const uint32_t *)(px + (size_t)(h / 2) * pitch + (w / 2) * 4) : 0);
     }
 
@@ -287,9 +291,11 @@ void retro_run(void) {
 size_t retro_serialize_size(void) { return p8_state_size(); }
 bool retro_serialize(void *data, size_t size) { return p8_state_save(data, size) == 0; }
 bool retro_unserialize(const void *data, size_t size) {
-    if (p8_state_load(data, size)) return false;
+    if (p8_state_load(data, size)) { p8_logf("pico8: state of %zu bytes not loaded", size); return false; }
     running = !p8_exited();
     host_ms = SHIM->vclock_ms;
+    static unsigned loads;
+    if (loads++ < 3) p8_logf("pico8: state loaded (%zu bytes)", size);  // not every rewind step
     return true;
 }
 
