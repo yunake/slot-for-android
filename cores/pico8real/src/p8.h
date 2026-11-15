@@ -43,7 +43,7 @@ struct p8ctx {
 };
 _Static_assert(sizeof(struct p8ctx) == 184, "p8ctx layout is shared with switch.S");
 
-enum { P8_RUN = 0, P8_FRAME = 1, P8_EXIT = 2 };
+enum { P8_RUN = 0, P8_FRAME = 1, P8_EXIT = 2, P8_IDLE = 3 };
 
 /* What a frame's input is: the keys PICO-8 sees held, by SDL scancode. */
 #define P8_KEYS 512
@@ -104,6 +104,7 @@ extern int p8_exit_code;
 uint64_t p8_switch(struct p8ctx *save, struct p8ctx *load, uint64_t value);
 void p8_yield_present(void *renderer);   /* SDL_RenderPresent */
 int p8_yield_window(void *window);       /* SDL_UpdateWindowSurface */
+void p8_yield_delay(uint32_t ms);        /* SDL_Delay */
 void p8_exit(int code) __attribute__((noreturn));
 int p8_setjmp(void *buf);
 void p8_longjmp(void *buf, int value) __attribute__((noreturn));

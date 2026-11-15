@@ -101,7 +101,16 @@ static uint32_t s_GetTicks(void) {
     if (++SHIM->gettick_spin > 20000) SHIM->vclock_ms++;
     return SHIM->vclock_ms;
 }
-static void s_Delay(uint32_t ms) { SHIM->vclock_ms += ms; }
+// The clock when PICO-8 last presented or gave the host its turn.
+static uint32_t turn_vclock;
+// SDL_Delay (through p8_yield_delay): 1 when PICO-8 has waited 50 ms
+// without presenting, and the host should run.
+int p8_pre_delay(uint32_t ms) {
+    SHIM->vclock_ms += ms;
+    if (SHIM->vclock_ms - turn_vclock < 50) return 0;
+    turn_vclock = SHIM->vclock_ms;
+    return 1;
+}
 
 /* ---- window and renderer ---- */
 static struct sdl_pixel_format *argb_format(void) {
@@ -394,7 +403,7 @@ static const struct { const char *name; void *fn; } table[] = {
     E(GetCurrentVideoDriver, s_cur_driver), E(GetNumVideoDisplays, one), E(GetDisplayName, s_GetDisplayName),
     E(GetDisplayBounds, s_GetDisplayBounds), E(GetDesktopDisplayMode, s_display_mode),
     E(GetCurrentDisplayMode, s_display_mode), E(GetDisplayMode, s_GetDisplayMode), E(GetNumDisplayModes, one),
-    E(GetTicks, s_GetTicks), E(Delay, s_Delay),
+    E(GetTicks, s_GetTicks), E(Delay, p8_yield_delay),
     E(CreateWindow, s_CreateWindow), E(DestroyWindow, s_DestroyWindow), E(GetWindowSize, s_GetWindowSize),
     E(GetWindowPosition, s_GetWindowPosition), E(GetWindowID, s_GetWindowID), E(GetWindowDisplayIndex, ok0),
     E(GetWindowSurface, s_GetWindowSurface), E(UpdateWindowSurface, p8_yield_window),

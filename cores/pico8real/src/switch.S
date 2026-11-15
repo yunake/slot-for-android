@@ -83,6 +83,26 @@ p8_yield_window:
     b p8_switch
     .size p8_yield_window, .-p8_yield_window
 
+// SDL_Delay: time passes; a PICO-8 that waits a while without presenting
+// (a download, a cart loading) gives the host its turn back as P8_IDLE, so
+// the host never hangs on it. Like the presents, nothing of the host stays
+// on PICO-8's stack: it resumes straight into PICO-8.
+    .globl p8_yield_delay
+    .type p8_yield_delay, %function
+p8_yield_delay:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    bl p8_pre_delay             // 1: give the host its turn
+    ldp x29, x30, [sp], #16
+    cbz x0, 1f
+    shim_ctx x0
+    adrp x1, p8_host_ctx
+    add x1, x1, :lo12:p8_host_ctx
+    mov x2, #3          /* P8_IDLE */
+    b p8_switch
+1:  ret
+    .size p8_yield_delay, .-p8_yield_delay
+
 // exit(): PICO-8 is done; the host sees P8_EXIT on this and every later frame.
     .globl p8_exit
     .type p8_exit, %function
